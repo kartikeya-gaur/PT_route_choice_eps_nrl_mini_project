@@ -1,0 +1,26 @@
+# Data (raw GTFS/demand files and generated processed outputs are large and
+# often licensed for redistribution - keep them local, not in git)
+data/raw/**
+data/processed/**
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Generated outputs
+outputs/models/*
+outputs/figures/*
+outputs/tables/*
+!outputs/models/.gitkeep
+!outputs/figures/.gitkeep
+!outputs/tables/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Environment
+.venv/
+venv/
+.env
