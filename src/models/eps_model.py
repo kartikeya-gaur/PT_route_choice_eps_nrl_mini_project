@@ -237,10 +237,23 @@ class EPSModel:
 
     @staticmethod
     def _neg_log_likelihood(params, est_df):
+        if est_df.empty:
+            # No informative rows to evaluate - e.g. called on an empty
+            # trips_df, or every observation got filtered out upstream.
+            # Returning 0.0 (rather than crashing on a KeyError from a
+            # columnless empty dataframe) makes this safe to call from
+            # scipy.optimize.minimize during fit() without special-casing
+            # every call site; log_likelihood() below is the one that
+            # decides whether an empty result is actually meaningful and
+            # surfaces a clear warning + NaN instead of a silent 0.0.
+            return 0.0
         b_ivt, b_wait, b_walk, b_transfer, b_ps = params
+        # b_ivt, b_ps = params
         util = (
-            -b_ivt * est_df["ivt_min"] - b_wait * est_df["wait_min"]
-            - b_walk * est_df["walk_min"] - b_transfer * est_df["n_transfers"]
+            b_ivt * est_df["ivt_min"] 
+            + b_wait * est_df["wait_min"]
+            + b_walk * est_df["walk_min"] 
+            + b_transfer * est_df["n_transfers"]
             + b_ps * np.log(est_df["expanded_path_size"].clip(lower=1e-9))
             + est_df["sampling_correction"]  # Mathematically exact offset
         )
@@ -284,9 +297,12 @@ class EPSModel:
         x0 = x0 or [self.beta["beta_ivt"], self.beta["beta_wait"], self.beta["beta_walk"],
                      self.beta["beta_transfer"], self.beta["beta_pathsize"]]
 
+        # x0 = x0 or [self.beta["beta_ivt"], self.beta["beta_pathsize"]]
+
         bounds = [(-coef_bound, coef_bound)] * len(x0)
         result = minimize(self._neg_log_likelihood, x0=x0, args=(est_df,), method="L-BFGS-B", bounds=bounds)
         names = ["beta_ivt", "beta_wait", "beta_walk", "beta_transfer", "beta_pathsize"]
+        # names = ["beta_ivt", "beta_pathsize"]
         fitted = dict(zip(names, result.x))
         fitted["log_likelihood"] = -result.fun
         fitted["n_observations"] = est_df["obs_id"].nunique()
@@ -295,7 +311,20 @@ class EPSModel:
         return fitted
 
     def log_likelihood(self, trips_df: pd.DataFrame, beta: dict, n_draws=20):
+        if trips_df.empty:
+            print("WARNING: log_likelihood called with an empty trips_df (0 rows) - "
+                  "returning NaN. This usually means your test split came out empty; "
+                  "check train_test_split's per-OD-pair rounding if most of your OD "
+                  "pairs have very few trips (see synthetic_trips.train_test_split - "
+                  "naive rounding sends small groups' test allocation to 0).")
+            return np.nan
         est_df = self.build_estimation_data(trips_df, n_draws=n_draws)
+        if est_df.empty:
+            print("WARNING: build_estimation_data produced no informative rows "
+                  "(e.g. every path in trips_df was unreachable in the current graph) "
+                  "- returning NaN.")
+            return np.nan
         params = [beta["beta_ivt"], beta["beta_wait"], beta["beta_walk"],
                   beta["beta_transfer"], beta["beta_pathsize"]]
+        # params = [beta["beta_ivt"], beta["beta_pathsize"]]
         return -self._neg_log_likelihood(params, est_df)

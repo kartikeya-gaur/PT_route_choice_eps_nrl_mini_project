@@ -85,13 +85,13 @@ def hit_rate(model, test_df: pd.DataFrame, fitted_beta: dict, path_col="chosen_p
 
 
 def summarize_comparison(eps_results: dict, nrl_results: dict) -> pd.DataFrame:
-    """Builds a side-by-side comparison table for the final report."""
     rows = []
-    for name in ["beta_ivt", "beta_wait", "beta_walk", "beta_transfer", "log_likelihood", "n_observations"]:
+    for name in ["beta_ivt", "beta_wait", "beta_walk", "beta_transfer", "beta_pathsize",
+                 "log_likelihood", "n_observations"]:
         rows.append({
             "metric": name,
             "EPS": eps_results.get(name),
-            "NRL": nrl_results.get(name),
+            "NRL": nrl_results.get(name),   # correctly shows blank/NaN for NRL, which has no path-size term
             "true_value": config.TRUE_UTILITY_PARAMS.get(name),
         })
     return pd.DataFrame(rows)

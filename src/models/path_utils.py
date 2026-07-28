@@ -17,6 +17,28 @@ logic but applied edge-by-edge rather than to a whole path at once.
 from src import config
 
 
+def generalized_time(ivt_min, wait_min, walk_min, wait_weight=2.0, walk_weight=2.0):
+    """Combines ivt/wait/walk into one generalized-time value using fixed
+    relative weights, rather than estimating separate coefficients for each.
+
+    ivt_min/wait_min/walk_min and n_transfers showed VIF ~5.5-6.8 against
+    each other in the synthetic Bengaluru/Sydney data - transferring
+    mechanically adds wait+walk+often ivt, so trying to freely estimate
+    separate beta_ivt/beta_wait/beta_walk sits on a near-flat log-likelihood
+    ridge. Collapsing to one beta_time coefficient (applied to this
+    function's output) with fixed weights drops VIF to ~3.3-3.9.
+
+    This is shared by nrl_model.py's and eps_model.py's "generalized_time"
+    utility_spec so wait_weight/walk_weight can't silently drift apart
+    between the two models. NRL calls this per-link with zeros for whichever
+    component that link type doesn't have (e.g. a transfer link passes
+    ivt_min=wait_min=0.0); EPS calls it once per whole estimation dataframe
+    with all three populated. Works with scalars or pandas Series/arrays
+    either way, since it's pure arithmetic.
+    """
+    return ivt_min + wait_weight * wait_min + walk_weight * walk_min
+
+
 def compute_path_components(edge_seq, headway_map, default_headway_min=None):
     """Segments a path's edge sequence into legs by route_id to correctly
     count boardings/transfers.
@@ -88,6 +110,21 @@ def systematic_utility(ivt_min, wait_min, walk_min, n_transfers, path_size_value
         - beta["beta_transfer"] * n_transfers
         + beta["beta_pathsize"] * np.log(max(path_size_value, 1e-9))
     )
+
+
+def softmax_utilities(utilities):
+    """Exact multinomial-logit probabilities over a fixed set of systematic
+    utilities: softmax(utilities). Equivalent in distribution to Eq. 15's
+    Gumbel-shock-argmax simulation protocol (synthetic_trips.
+    generate_synthetic_trips_universal), just returning the analytic
+    probabilities directly rather than simulated choice frequencies - use
+    this to reproduce a Fig.-4-style plot exactly (no simulation noise)
+    from the systematic_utilities array that function also returns.
+    """
+    import numpy as np
+    u = np.asarray(utilities, dtype=float)
+    p = np.exp(u - u.max())
+    return p / p.sum()
 
 
 def cast_node_id(x, example_node=None):

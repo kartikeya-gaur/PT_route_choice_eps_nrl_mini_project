@@ -9,7 +9,7 @@ START = "START"
 
 class NRLModel:
     def __init__(self, graph: nx.DiGraph, headway_map: dict, beta: dict = None,
-                 max_iter=150, tol=1e-3):
+                 max_iter=300, tol=1e-3):
         self.G = graph
         self.headway_map = headway_map
         default_beta = {
@@ -210,7 +210,7 @@ class NRLModel:
         return neg_ll
 
     def fit(self, trips_df: pd.DataFrame, x0=None, path_col="chosen_path", sep="|",
-            method="Nelder-Mead", coef_bound=5.0, warm_start_frac=0.25,
+            method="L-BFGS-B", coef_bound=5.0, warm_start_frac=0.25,
             warm_start_min_n=50, random_seed=None):
         x0 = x0 or [
             self.beta["beta_ivt"], 
