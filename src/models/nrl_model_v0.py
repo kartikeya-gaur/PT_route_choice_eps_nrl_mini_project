@@ -4,7 +4,6 @@ import networkx as nx
 from scipy.optimize import minimize
 from tqdm import tqdm  # Imported tqdm
 from src.models import path_utils
-from src.models.inference import standard_errors_from_nll
 
 START = "START"
 
@@ -212,16 +211,7 @@ class NRLModel:
 
     def fit(self, trips_df: pd.DataFrame, x0=None, path_col="chosen_path", sep="|",
             method="L-BFGS-B", coef_bound=5.0, warm_start_frac=0.25,
-            warm_start_min_n=50, random_seed=None, compute_se=False, se_eps=1e-4):
-        """compute_se defaults to False (unlike EPSModel.fit): a numerical
-        Hessian for NRL's 6 parameters needs ~84 extra full objective
-        evaluations, and each evaluation here re-solves the Bellman value-
-        iteration recursion for every unique destination in `paths` - i.e.
-        roughly 84 more passes at the same cost as the full-batch phase 2
-        optimization above. Given this script's own warning that a single
-        NRL fit can take many minutes, pass compute_se=True only once
-        you've confirmed the base fit's runtime is acceptable to you first.
-        """
+            warm_start_min_n=50, random_seed=None):
         x0 = x0 or [
             self.beta["beta_ivt"], 
             self.beta["beta_wait"],
@@ -264,17 +254,5 @@ class NRLModel:
         fitted["log_likelihood"] = -result.fun
         fitted["n_observations"] = len(paths)
         fitted["converged"] = result.success
-
-        if compute_se:
-            print(f"NRL.fit: compute_se=True - running a numerical Hessian over {len(paths)} "
-                  f"paths ({len({p[-1] for p in paths})} destinations); this re-solves the "
-                  f"Bellman recursion ~84 more times, comparable in cost to the full-batch "
-                  f"phase 2 fit above.")
-            se_stats = standard_errors_from_nll(full_obj, result.x, names, eps=se_eps)
-            for name, stats_dict in se_stats.items():
-                fitted[f"se_{name}"] = stats_dict["se"]
-                fitted[f"z_{name}"] = stats_dict["z"]
-                fitted[f"pval_{name}"] = stats_dict["pval"]
-
         self.fitted_params = fitted
         return fitted

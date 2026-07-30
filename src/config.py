@@ -137,10 +137,10 @@ RANDOM_SEED = 42
 # starting points, so recovering something close to these is the sanity
 # check for both estimators.
 TRUE_UTILITY_PARAMS = {
-    "beta_ivt": -0.025,        # per in-vehicle minute
-    "beta_wait": -0.05,        # per waiting minute (perceived worse than in-vehicle)
-    "beta_walk": -0.035,       # per walking minute
-    "beta_transfer": -0.4,     # fixed penalty per transfer (minutes-equivalent)
+    "beta_ivt": 0.025,        # per in-vehicle minute
+    "beta_wait": 0.05,        # per waiting minute (perceived worse than in-vehicle)
+    "beta_walk": 0.035,       # per walking minute
+    "beta_transfer": 0.4,     # fixed penalty per transfer (minutes-equivalent)
     "beta_pathsize": 1.0,     # standard Path Size Logit coefficient
 }
 

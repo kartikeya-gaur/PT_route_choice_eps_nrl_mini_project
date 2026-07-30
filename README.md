@@ -5,6 +5,14 @@ Comparative implementation of two route-choice estimation methods —
 and **Nested Recursive Logit** (NRL; Mai, Fosgerau & Frejinger, 2015) — on
 real transit networks in **Sydney** and **Bengaluru**.
 
+> [!IMPORTANT]
+> 🚧 **Work in Progress**
+>
+> The repository is currently under active development. At present, the
+> estimation and evaluation pipeline runs on **a single OD pair** for each
+> city (Sydney and Bengaluru). Full-network experiments will be added in a
+> future update.
+
 ## Why synthetic choice data
 
 Neither method can be estimated from OD counts or patronage data alone —

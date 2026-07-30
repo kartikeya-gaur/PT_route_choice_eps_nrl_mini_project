@@ -112,10 +112,6 @@ def generate_synthetic_trips(graph: nx.DiGraph, od_matrix: pd.DataFrame, headway
           f"{trips_df['choice_set_size'].mean():.1f}" if len(trips_df) else "Generated 0 synthetic trips")
     return trips_df
 
-
-import numpy as np
-
-
 def generate_synthetic_trips_universal(graph: nx.DiGraph, origin, dest, headway_map: dict,
                                         n_obs=3000, max_paths=500, beta: dict = None,
                                         random_seed=None):
@@ -242,7 +238,6 @@ def train_test_split(trips_df, test_fraction=None, random_seed=None):
     this module - both should already be present if you're pasting this
     into the existing synthetic_trips.py.
     """
-    from src import config  # local import if this isn't already imported at module level
 
     test_fraction = test_fraction or config.TEST_FRACTION
     random_seed = random_seed or config.RANDOM_SEED

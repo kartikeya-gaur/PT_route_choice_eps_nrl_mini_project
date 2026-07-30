@@ -65,7 +65,15 @@ def run_city(city: str, skip_models: bool = False, model: str = "both", n_eps_dr
     print(f"Headways: {headway_map}")
 
     # 4. synthetic disaggregate trips
-    trips_df = synthetic_trips.generate_synthetic_trips(graph, od_matrix, headway_map)
+    # 4. synthetic disaggregate trips
+    scale_trips = config.TARGET_TOTAL_SYNTHETIC_TRIPS / od_matrix["total_trips"].sum()
+    trips_df = synthetic_trips.generate_synthetic_trips(
+        graph, 
+        od_matrix, 
+        headway_map, 
+        scale_trips=scale_trips,
+        min_trips_per_od=config.MIN_TRIPS_PER_OD
+    )
     train_df, test_df = synthetic_trips.train_test_split(trips_df)
     trips_df.to_csv(out_dir / "synthetic_trips.csv", index=False)
     train_df.to_csv(out_dir / "synthetic_trips_train.csv", index=False)

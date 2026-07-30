@@ -104,7 +104,7 @@ def systematic_utility(ivt_min, wait_min, walk_min, n_transfers, path_size_value
     """
     import numpy as np
     return (
-        -beta["beta_ivt"] * ivt_min
+        - beta["beta_ivt"] * ivt_min
         - beta["beta_wait"] * wait_min
         - beta["beta_walk"] * walk_min
         - beta["beta_transfer"] * n_transfers
