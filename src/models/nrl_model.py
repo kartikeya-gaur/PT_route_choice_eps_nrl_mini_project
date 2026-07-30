@@ -80,12 +80,13 @@ class NRLModel:
             return 1.0
             
         if attrs["link_type"] == "transfer":
+            # Estimate only the scale parameter for the transfer nest
             scale_param = beta.get("beta_scale_transfer", 0.0)
+            mu = 1.0 / (1.0 + np.exp(-scale_param))
+            return np.clip(mu, 1e-4, 1.0)
         else:
-            scale_param = beta.get("beta_scale_regular", 0.0)
-            
-        mu = 1.0 / (1.0 + np.exp(-scale_param))
-        return np.clip(mu, 1e-4, 1.0)
+            # Normalize the regular nest scale to exactly 1.0 (fixed reference scale)
+            return 1.0
 
     def _precompute_transitions(self, beta):
         N = len(self.links)
@@ -193,11 +194,10 @@ class NRLModel:
                 "beta_wait": params[1],
                 "beta_walk": params[2], 
                 "beta_transfer": params[3],
-                "beta_scale_transfer": params[4],
-                "beta_scale_regular": params[5],
+                "beta_scale_transfer": params[4],  # Only 5 parameters estimated now
+                "beta_scale_regular": 0.0,         # Fixed/Normalized
                 "beta_pathsize": 0.0
             }
-            # Added tqdm with leave=False to show current evaluation progress cleanly
             nll = -sum(
                 self.path_log_prob(p, b) 
                 for p in tqdm(paths, desc=f"Evaluating NLL{label}", leave=False)
@@ -212,25 +212,27 @@ class NRLModel:
 
     def fit(self, trips_df: pd.DataFrame, x0=None, path_col="chosen_path", sep="|",
             method="L-BFGS-B", coef_bound=5.0, warm_start_frac=0.25,
-            warm_start_min_n=50, random_seed=None, compute_se=False, se_eps=1e-4):
-        """compute_se defaults to False (unlike EPSModel.fit): a numerical
-        Hessian for NRL's 6 parameters needs ~84 extra full objective
-        evaluations, and each evaluation here re-solves the Bellman value-
-        iteration recursion for every unique destination in `paths` - i.e.
-        roughly 84 more passes at the same cost as the full-batch phase 2
-        optimization above. Given this script's own warning that a single
-        NRL fit can take many minutes, pass compute_se=True only once
-        you've confirmed the base fit's runtime is acceptable to you first.
-        """
+            warm_start_min_n=50, random_seed=None, compute_se=False, se_eps=1e-3):
+        
+        # Initial starting values (5 parameters instead of 6)
         x0 = x0 or [
             self.beta["beta_ivt"], 
             self.beta["beta_wait"],
             self.beta["beta_walk"], 
             self.beta["beta_transfer"],
-            self.beta["beta_scale_transfer"],
-            self.beta["beta_scale_regular"]
+            self.beta["beta_scale_transfer"]
         ]
-        bounds = [(-coef_bound, coef_bound)] * len(x0)
+        
+        # Define precise sign boundaries:
+        # - The first four parameters must be strictly positive (> 0) to remain disutilities
+        # - The scale parameter can remain unconstrained on [-coef_bound, coef_bound]
+        bounds = [
+            (1e-5, coef_bound),         # beta_ivt
+            (1e-5, coef_bound),         # beta_wait
+            (1e-5, coef_bound),         # beta_walk
+            (1e-5, coef_bound),         # beta_transfer
+            (-coef_bound, coef_bound)   # beta_scale_transfer
+        ]
 
         rng = np.random.default_rng(random_seed if random_seed is not None else 42)
         n_warm = max(warm_start_min_n, int(round(len(trips_df) * warm_start_frac)))
@@ -256,20 +258,20 @@ class NRLModel:
         full_obj = self._make_objective(paths, tag="full")
         result = minimize(full_obj, x0=x0, method=method, bounds=bounds, options={"xatol": 1e-3, "fatol": 1e-3, "maxiter": 300, "maxfev": 300})
 
+        # Update return keys to reflect the 5-parameter model
         names = [
             "beta_ivt", "beta_wait", "beta_walk", "beta_transfer", 
-            "beta_scale_transfer", "beta_scale_regular"
+            "beta_scale_transfer"
         ]
         fitted = dict(zip(names, result.x))
+        fitted["beta_scale_regular"] = 0.0  # Added as a constant for output compatibility
         fitted["log_likelihood"] = -result.fun
         fitted["n_observations"] = len(paths)
         fitted["converged"] = result.success
 
         if compute_se:
             print(f"NRL.fit: compute_se=True - running a numerical Hessian over {len(paths)} "
-                  f"paths ({len({p[-1] for p in paths})} destinations); this re-solves the "
-                  f"Bellman recursion ~84 more times, comparable in cost to the full-batch "
-                  f"phase 2 fit above.")
+                  f"paths ({len({p[-1] for p in paths})} destinations)...")
             se_stats = standard_errors_from_nll(full_obj, result.x, names, eps=se_eps)
             for name, stats_dict in se_stats.items():
                 fitted[f"se_{name}"] = stats_dict["se"]
